@@ -53,7 +53,7 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 
 // What page to grab!
 #define WEBSITE      "www.graffiticode.org"
-#define WEBPAGE      "/graffiti/946"
+#define WEBPAGE      "/graffiti/dr10/latest"
 
 // BEGIN STEPPER DECLS
 
@@ -208,18 +208,7 @@ long hex2int(char *a, int len)
     return val;
 }
 
-
-// EDIT ME!
-// Calibrate your bot so that the following code draws a perfect square.
-//   step(400, 400);
-//   step(-450, 450);
-//   step(400, 400);
-//   step(-450, 450);
-//   step(400, 400);
-//   step(-450, 450);
-//   step(400, 400);
-//   step(-450, 450);
-const float CALIBRATE = 2.907;  // The original DR10's calibration
+const float CALIBRATE = 2.910;  // The original DR10's calibration
 
 const int START = 0x01;
 int state = START;
@@ -293,51 +282,43 @@ void penDown() {
 #define SPEED 500
 
 void step(long lsteps, long rsteps) { // 2000, 1000
-//  Serial.print("step ");
-//  Serial.print(lsteps);
-//  Serial.print(" ");
-//  Serial.print(rsteps);
   int dirL = (lsteps > 0) ? BACKWARD : FORWARD;
   int dirR = (rsteps > 0) ? BACKWARD : FORWARD;
   lsteps = abs(lsteps);
   rsteps = abs(rsteps);
   if (lsteps >= rsteps) {
     double offset = 0;
-    double delta = double(lsteps - rsteps) / rsteps;  // 3
-//    Serial.print("\ndelta=");
-//    Serial.print(delta);
-    for ( ; rsteps > 0; ) {
-      offset += delta;
-      stepOne(dirL, dirR, SPEED);
-      lsteps--;
-      rsteps--;
-      for(; offset >= 1; offset--) {  // 3 * 0 | 3 * 1
-        stepOneLeft(dirL, SPEED);
+    if (rsteps > 0) {
+      double delta = double(lsteps - rsteps) / rsteps;  // 3
+      for ( ; rsteps > 0; ) {
+        offset += delta;
+        stepOne(dirL, dirR, SPEED);
         lsteps--;
+        rsteps--;
+        for(; offset >= 1; offset--) {  // 3 * 0 | 3 * 1
+          stepOneLeft(dirL, SPEED);
+          lsteps--;
+        }
       }
     }
-//    Serial.print("\nlsteps=");
-//    Serial.print(rsteps);
     for(; lsteps > 0; lsteps--) {
       stepOneLeft(dirL, SPEED);
     }
   } else {
     double offset = 0;
-    double delta = double(rsteps - lsteps) / lsteps;
-//    Serial.print("\ndelta=");
-//    Serial.print(delta);
-    for ( ; lsteps > 0; ) {
-      offset += delta;
-      stepOne(dirL, dirR, SPEED);
-      lsteps--;
-      rsteps--;
-      for(; offset >= 1; offset--) {  // 3 * 0 | 3 * 1
-        stepOneRight(dirR, SPEED);
+    if (lsteps > 0) {
+      double delta = double(rsteps - lsteps) / lsteps;
+      for ( ; lsteps > 0; ) {
+        offset += delta;
+        stepOne(dirL, dirR, SPEED);
+        lsteps--;
         rsteps--;
+        for(; offset >= 1; offset--) {  // 3 * 0 | 3 * 1
+          stepOneRight(dirR, SPEED);
+          rsteps--;
+        }
       }
     }
-//    Serial.print("\nrsteps=");
-//    Serial.print(rsteps);
     for(; rsteps > 0; rsteps--) {
       stepOneRight(dirR, SPEED);
     }
