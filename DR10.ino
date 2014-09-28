@@ -105,6 +105,15 @@ int pos = 60;    // variable to store the servo position
 uint32_t ip;
 Adafruit_CC3000_Client www;
 
+const float CALIBRATE = 2.910;  // The original DR10's calibration
+const int CODE_BUFFER_SIZE = 256;
+char* code;
+int i = 0;
+char readCodeChar() {
+  Serial.print(code[i]);
+  return code[i++];
+}
+
 void setup(void)
 {
   Serial.begin(115200);
@@ -178,21 +187,90 @@ void setup(void)
   }
 
   // Read data until either the connection is closed, or the idle timeout is reached.
-//  unsigned long lastRead = millis();
-//  while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) {
-//    while (www.available()) {
-//      char c = www.read();
-//      Serial.print(c);
-//      lastRead = millis();
-//    }
-//  }
-//  www.close();
+  code = new char[CODE_BUFFER_SIZE];
+  if (!code) {
+    Serial.println("\nUnable allocate code buffer.");
+  }
+  const int START = 0x01;
+  const int READ = 0x02;
+  const int STOP = 0x03;
+  int state = START;
+  unsigned long lastRead = millis();
+  int i = 0;
+  char c = www.read();
+  while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) {
+    while (www.available()) {
+      Serial.print(c);
+      lastRead = millis();
+      switch (state) {
+      case READ:
+        Serial.print(c);
+        code[i++] = c;
+        break;
+      case START:
+        if (c == 'P') {
+          if ((c = www.read()) == 'D') {
+            Serial.print("READ");
+            state = READ;
+          }
+          continue;  // avoid reading another char
+        }
+        break;
+      default:
+        break;
+      }
+      c = www.read();
+    }
+  }
+  www.close();
+  Serial.print("\ncode=");
+  Serial.print(code);
 
   // You need to make sure to clean up after yourself or the CC3000 can freak out
   // the next time your try to connect ...
-//  Serial.println(F("\n\nDisconnecting"));
-//  cc3000.disconnect();
+  Serial.println(F("\n\nDisconnecting"));
+  cc3000.disconnect();
 
+  i = 0;
+  char *buf = new char[10];
+  code[i] = 0; // terminate string
+  state = START;
+  while (code[i] != 0 && i < CODE_BUFFER_SIZE)
+  {
+    long v1, v2;
+    buf[4] = 0;
+    char c;
+    switch (state) {
+    case START:
+      c = readCodeChar();
+      switch (c) {
+      case 'S':
+        switch (readCodeChar()) {
+        case 'S':
+          //Serial.print("\nCALIBRATE ");
+          //Serial.print(CALIBRATE);
+          buf[0] = readCodeChar();
+          buf[1] = readCodeChar();
+          buf[2] = readCodeChar();
+          buf[3] = readCodeChar();
+          v1 = hex2int(buf, 4);
+          buf[0] = readCodeChar();
+          buf[1] = readCodeChar();
+          buf[2] = readCodeChar();
+          buf[3] = readCodeChar();
+          v2 = hex2int(buf, 4);
+          Serial.print("\nSS ");
+          Serial.print(v1);
+          Serial.print(" ");
+          Serial.print(v2);
+          step(v1*CALIBRATE, v2*CALIBRATE);
+          break;
+        }
+        break;
+      }
+      break;
+    }
+  }
 }
 
 long hex2int(char *a, int len)
@@ -208,47 +286,7 @@ long hex2int(char *a, int len)
     return val;
 }
 
-const float CALIBRATE = 2.910;  // The original DR10's calibration
-
-const int START = 0x01;
-int state = START;
-char *buf = new char[10];
 void loop() {
-  if(www.available() )       // if data is available to read
-  {
-    long v1, v2;
-    buf[4] = 0;
-    char c = www.read();
-    switch (state) {
-    case START:
-      switch (c) {
-      case 'S':
-        switch (www.read()) {
-        case 'S':
-          //Serial.print("\nCALIBRATE ");
-          //Serial.print(CALIBRATE);
-          buf[0] = www.read();
-          buf[1] = www.read();
-          buf[2] = www.read();
-          buf[3] = www.read();
-          v1 = hex2int(buf, 4);
-          buf[0] = www.read();
-          buf[1] = www.read();
-          buf[2] = www.read();
-          buf[3] = www.read();
-          v2 = hex2int(buf, 4);
-          Serial.print("\nSS ");
-          Serial.print(v1);
-          Serial.print(" ");
-          Serial.print(v2);
-          step(v1*CALIBRATE, v2*CALIBRATE);
-          break;
-        }
-        break;
-      }
-      break;
-    }
-  }
 }
 
 // FIXME
