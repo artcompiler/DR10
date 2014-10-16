@@ -110,7 +110,6 @@ const int CODE_BUFFER_SIZE = 256;
 char* code;
 int i = 0;
 char readCodeChar() {
-  Serial.print(code[i]);
   return code[i++];
 }
 
@@ -165,14 +164,8 @@ void setup(void)
 
   cc3000.printIPdotsRev(ip);
   
-  // Optional: Do a ping test on the website
-//  Serial.print(F("\n\rPinging ")); cc3000.printIPdotsRev(ip); Serial.print("...");  
-//  int replies = cc3000.ping(ip, 5);
-//  Serial.print(replies); Serial.println(F(" replies"));
-
-  /* Try connecting to the website.
-     Note: HTTP/1.1 protocol is used to keep the server from closing the connection before all data is read.
-  */
+  // Try connecting to the website.
+  // Note: HTTP/1.1 protocol is used to keep the server from closing the connection before all data is read.
   www = cc3000.connectTCP(ip, 80);
   if (www.connected()) {
     www.fastrprint(F("GET "));
@@ -199,19 +192,17 @@ void setup(void)
   int i = 0;
   char c = www.read();
   while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) {
-    while (www.available()) {
-      Serial.print(c);
+    while (i < CODE_BUFFER_SIZE - 1 && www.available()) {
       lastRead = millis();
       switch (state) {
       case READ:
-        Serial.print(c);
         code[i++] = c;
         break;
       case START:
         if (c == 'P') {
           if ((c = www.read()) == 'D') {
-            Serial.print("READ");
             state = READ;
+            c = www.read();
           }
           continue;  // avoid reading another char
         }
@@ -222,9 +213,13 @@ void setup(void)
       c = www.read();
     }
   }
+  code[i] = 0;
   www.close();
-  Serial.print("\ncode=");
-  Serial.print(code);
+  if (i == CODE_BUFFER_SIZE - 1) {
+    Serial.println("\nERROR too much code!");
+  }
+  Serial.print("\nCODE: ");
+  Serial.println(code);
 
   // You need to make sure to clean up after yourself or the CC3000 can freak out
   // the next time your try to connect ...
@@ -233,7 +228,6 @@ void setup(void)
 
   i = 0;
   char *buf = new char[10];
-  code[i] = 0; // terminate string
   state = START;
   while (code[i] != 0 && i < CODE_BUFFER_SIZE)
   {
@@ -247,8 +241,6 @@ void setup(void)
       case 'S':
         switch (readCodeChar()) {
         case 'S':
-          //Serial.print("\nCALIBRATE ");
-          //Serial.print(CALIBRATE);
           buf[0] = readCodeChar();
           buf[1] = readCodeChar();
           buf[2] = readCodeChar();
@@ -267,9 +259,14 @@ void setup(void)
           break;
         }
         break;
+      case 0:
+        state = STOP;
+        break;
       }
       break;
-    }
+    case STOP:
+      return;
+    }    
   }
 }
 
