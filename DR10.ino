@@ -87,9 +87,9 @@ AccelStepper stepper2(FULLSTEP, motorPin5, motorPin7, motorPin6, motorPin8);
 
 // BEGIN SERVO DECLS
 
-//#include <Servo.h> 
+#include <Servo.h> 
  
-//Servo myservo;  // create servo object to control a servo 
+Servo myservo;  // create servo object to control a servo 
                 // a maximum of eight servo objects can be created 
 int pos = 60;    // variable to store the servo position 
 
@@ -121,9 +121,8 @@ void setup(void)
   stepper1.setMaxSpeed(1500.0);
   stepper2.setMaxSpeed(1500.0);
 
-//  myservo.attach(9);  // attaches the servo on pin 9 to the servo object 
-
-
+  myservo.attach(2);  // attaches the servo on pin 2 to the servo object 
+  penUp();
 
   Serial.println(F("Hello, CC3000!\n"));
   Serial.print("Free RAM: "); Serial.println(getFreeRam(), DEC);
@@ -190,35 +189,38 @@ void setup(void)
   int state = START;
   unsigned long lastRead = millis();
   int i = 0;
-  char c = www.read();
   while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) {
     while (i < CODE_BUFFER_SIZE - 1 && www.available()) {
+      char c = www.read();
       lastRead = millis();
       switch (state) {
       case READ:
         code[i++] = c;
         break;
       case START:
-        if (c == 'P') {
-          if ((c = www.read()) == 'D') {
+        if (c == 'P' && (c = www.read()) == 'D') {
+            code[i++] = 'P';
+            code[i++] = 'D';
             state = READ;
-            c = www.read();
-          }
-          continue;  // avoid reading another char
+        } else if (c == 'D' &&
+            (c = www.read()) == 'R' &&
+            (c = www.read()) == 'X') {
+            state = READ;
         }
         break;
       default:
         break;
       }
-      c = www.read();
     }
   }
   code[i] = 0;
   www.close();
-  if (i == CODE_BUFFER_SIZE - 1) {
+  if (i >= CODE_BUFFER_SIZE - 1) {
     Serial.println("\nERROR too much code!");
   }
-  Serial.print("\nCODE: ");
+  Serial.print("\nCODE size: ");
+  Serial.println(i);
+  Serial.print("\nCODE bytes: ");
   Serial.println(code);
 
   // You need to make sure to clean up after yourself or the CC3000 can freak out
@@ -259,6 +261,18 @@ void setup(void)
           break;
         }
         break;
+      case 'P':
+        switch (readCodeChar()) {
+        case 'U':
+          Serial.print("\nPU");
+          penUp();
+          break;
+        case 'D':
+          Serial.print("\nPD");
+          penDown();
+          break;
+        }
+        break;
       case 0:
         state = STOP;
         break;
@@ -268,6 +282,7 @@ void setup(void)
       return;
     }    
   }
+  penUp();
 }
 
 long hex2int(char *a, int len)
@@ -286,9 +301,7 @@ long hex2int(char *a, int len)
 void loop() {
 }
 
-// FIXME
 void penUp() {
-  /*
   for(; pos < 60; pos += 1)  // goes from 0 degrees to 180 degrees 
   {                                 // in steps of 1 degree 
     myservo.write(pos);              // tell servo to go to position in variable 'pos' 
@@ -297,12 +310,9 @@ void penUp() {
   } 
   pos = 60;
   myservo.write(pos);              // tell servo to go to position in variable 'pos' 
-  */
 }
 
-// FIXME
 void penDown() {
-  /*
   for(; pos > 0; pos -= 1)  // goes from 0 degrees to 180 degrees 
   {                                  // in steps of 1 degree 
     myservo.write(pos);              // tell servo to go to position in variable 'pos' 
@@ -311,7 +321,6 @@ void penDown() {
   }
   pos = 0;
   myservo.write(pos);              // tell servo to go to position in variable 'pos' 
-  */
 }
 
 #define SPEED 500
